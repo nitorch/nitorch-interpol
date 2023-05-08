@@ -52,34 +52,41 @@ resampled = interpol.pull(signal, coordinates, order=3, prefilter=True)
 
 #### Common options
 
-`order` can be an int or a string. Possible values are:
-    - 0 or 'nearest'
-    - 1 or 'linear'
-    - 2 or 'quadratic'
-    - 3 or 'cubic'
-    - 4 or 'fourth'
-    - 5 or 'fifth'
-    - 6 or 'sixth'
-    - 7 or 'seventh'
-A list of values can be provided, in the order [W, H, D],
+- `order` can be an int or a string. Possible values are:
+
+| `int` | `str1`      |
+| ----- | ----------- |
+| 0     | 'nearest'   |
+| 1     | 'linear'    |
+| 2     | 'quadratic' |
+| 3     | 'cubic'     |
+| 4     | 'fourth'    |
+| 5     | 'fifth'     |
+| 6     | 'sixth'     |
+| 7     | 'seventh'   |
+
+A list of values can be provided, in the order `[W, H, D]`,
 to specify dimension-specific interpolation orders.
 
-`bound` must be a string. Possible values are:
+- `bound` must be a string. Possible values are:
+
 | FFT-like name | SciPy-like name |  Extrapolation pattern                |
 | ------------- | --------------- | ------------------------------------- |
-| 'dct1'        | 'mirror'        | ` d  c  b  |  a  b  c  d  |  c  b  a` |
-| 'dct2'        | 'reflect'       | ` c  b  a  |  a  b  c  d  |  d  c  b` |
-| 'dst1'        | 'antimirror'    | `-b -a  0  |  a  b  c  d  |  0 -d -c` |
-| 'dst2'        | 'antireflect'   | `-c -b -a  |  a  b  c  d  | -d -c -b` |
-| 'dft'         | 'wrap'          | ` b  c  d  |  a  b  c  d  |  a  b  c` |
-| 'zero'        | 'zeros'         | ` 0  0  0  |  a  b  c  d  |  0  0  0` |
-| 'replicate'   | 'nearest'       | ` a  a  a  |  a  b  c  d  |  d  d  d` |
-A list of values can be provided, in the order [W, H, D],
+| 'dct1'        | 'mirror'        | <pre> d  c  b  &vert;  a  b  c  d  &vert;  c  b  a</pre> |
+| 'dct2'        | 'reflect'       | <pre> c  b  a  &vert;  a  b  c  d  &vert;  d  c  b</pre> |
+| 'dst1'        | 'antimirror'    | <pre>-b -a  0  &vert;  a  b  c  d  &vert;  0 -d -c</pre> |
+| 'dst2'        | 'antireflect'   | <pre>-c -b -a  &vert;  a  b  c  d  &vert; -d -c -b</pre> |
+| 'dft'         | 'wrap'          | <pre> b  c  d  &vert;  a  b  c  d  &vert;  a  b  c</pre> |
+| 'zero'        | 'zeros'         | <pre> 0  0  0  &vert;  a  b  c  d  &vert;  0  0  0</pre> |
+| 'replicate'   | 'nearest'       | <pre> a  a  a  &vert;  a  b  c  d  &vert;  d  d  d</pre> |
+
+A list of values can be provided, in the order `[W, H, D]`,
 to specify dimension-specific boundary conditions.
 Note that
 - `dft` corresponds to circular padding
 - `dct2` corresponds to Neumann boundary conditions (symmetric)
 - `dst2` corresponds to Dirichlet boundary conditions (antisymmetric)
+
 See:
  - https://en.wikipedia.org/wiki/Discrete_cosine_transform
  - https://en.wikipedia.org/wiki/Discrete_sine_transform
