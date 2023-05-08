@@ -13,7 +13,7 @@ from .utils import meshgrid_script_ij
 
 @torch.jit.script
 def cartesian_grid(
-        shape: Sequence[int],
+        shape: List[int],
         dtype: Optional[torch.dtype] = None,
         device: Optional[torch.device] = None,
 ) -> List[Tensor]:
@@ -76,7 +76,7 @@ def cartesian_grid_like(
 
 @torch.jit.script
 def identity_grid(
-        shape: Sequence[int],
+        shape: List[int],
         dtype: Optional[torch.dtype] = None,
         device: Optional[torch.device] = None,
 ) -> Tensor:
