@@ -65,6 +65,11 @@ def make_vector(input, n=None, crop=True, *args,
     return torch.cat([input, default])
 
 
+def same_storage(x: torch.Tensor, y: torch.Tensor) -> bool:
+    """Return true if `x` and `y` share the same underlying storage."""
+    return x.storage().data_ptr() == y.storage().data_ptr()
+
+
 # There's been a bunch of changes to the meshgrid API across torch versions
 # (plus, the API is different in torchscipt and plain torch).
 # These functions should work consistently across versions.

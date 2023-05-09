@@ -1,3 +1,47 @@
+"""
+## Overview
+
+Resizing is highly related to resampling, except that sampling happens
+on a regular grid of coordinates, which can be finer or coarser than the
+input lattice. The `resize` function is related to
+[`scipy.ndimage.zoom`](https://docs.scipy.org/doc/scipy/reference/generated/scipy.ndimage.zoom.html)
+and
+[`torch.interpolate`](https://pytorch.org/docs/stable/generated/torch.nn.functional.interpolate.html).
+
+The function `restrict` is the numerical adjoint of `resize` with respect
+to the first argument (when `reduce_sum=True`).
+
+### Anchors
+
+Resizing operator have slightly different behaviours depending on which
+elements of the lattice are kept in alignment across resolutions. This
+relates to the `grid_mode` option in
+[`scipy.ndimage.zoom`](https://docs.scipy.org/doc/scipy/reference/generated/scipy.ndimage.zoom.html),
+or the `align_corners` options in
+[`torch.interpolate`](https://pytorch.org/docs/stable/generated/torch.nn.functional.interpolate.html).
+In `nitorch`, we use the option `anchor`, which can take values `"edge"`,
+`"center"` or `None`. When either `"edge"` or `"center"` is used, the
+effective resolution ratio will slightly differ from the prescribed
+`factor` (which is then only used to compute the shape of the resized
+image). The first option (`"edge"`) aligns the edges of the first and
+last voxels across resolutions, while the second option (`"center"`)
+aligns the centers of the corner voxels.  When `None` is used, the
+center of the top-right corner is aligned, and the prescribed `factor`
+is used exactly.
+
+```
+         edge           center           None
+    e - + - + - e   + - + - + - +   + - + - + - +
+    | . | . | . |   | c | . | c |   | f | . | . |
+    + _ + _ + _ +   + _ + _ + _ +   + _ + _ + _ +
+    | . | . | . |   | . | . | . |   | . | . | . |
+    + _ + _ + _ +   + _ + _ + _ +   + _ + _ + _ +
+    | . | . | . |   | c | . | c |   | . | . | . |
+    e _ + _ + _ e   + _ + _ + _ +   + _ + _ + _ +
+```
+
+---
+"""
 __all__ = [
     'resize', 'restrict',
     'resize_flow', 'restrict_flow',
@@ -168,8 +212,8 @@ def restrict_flow(
 
 
 def resize_affine(
-        inshape: Sequence[int],
         affine: Tensor,
+        inshape: Sequence[int],
         factor: Optional[OneOrSeveral[float]] = None,
         shape: Optional[OneOrSeveral[int]] = None,
         anchor: AnchorType = 'edge',
@@ -178,10 +222,10 @@ def resize_affine(
 
     Parameters
     ----------
-    inshape : `sequence[int]`
-        Spatial shape of the input tensor, with length `ndim`.
     affine : `(ndim+1, ndim+1) tensor`
         Orientation matrix of the input tensor, with shape `(ndim+1, ndim+1)`.
+    inshape : `sequence[int]`
+        Spatial shape of the input tensor, with length `ndim`.
     factor : `[sequence of] float`, optional
         Factor by which to resize the tensor (> 1 == bigger)
         One of factor or shape must be provided.

@@ -1,14 +1,25 @@
+"""
+## Overview
+This module contains utility functions for generating commonly used
+coordinate grids (_e.g._, identity, affine), as well as tools that
+act on flows or coordinate grids (_e.g._, Jacobian).
+
+---
+"""
 __all__ = [
     'cartesian_grid', 'cartesian_grid_like',
     'identity_grid', 'identity_grid_like',
     'add_identity_grid', 'add_identity_grid_',
     'sub_identity_grid', 'sub_identity_grid_',
     'affine_grid', 'affine_flow',
+    'flow_jacobian', 'grid_jacobian',
 ]
 import torch
 from torch import Tensor
 from typing import Sequence, Optional, List
-from .utils import meshgrid_script_ij
+from jitfields.typing import OneOrSeveral
+from .utils import meshgrid_script_ij, ensure_list, make_vector
+from .finite_differences import diff
 
 
 @torch.jit.script
@@ -128,7 +139,7 @@ def identity_grid_like(
 
 
 @torch.jit.script
-def add_identity_grid_(disp):
+def add_identity_grid_(disp: Tensor) -> Tensor:
     """Adds the identity grid to a displacement field, inplace.
 
     Parameters
@@ -151,7 +162,7 @@ def add_identity_grid_(disp):
 
 
 @torch.jit.script
-def add_identity_grid(disp):
+def add_identity_grid(disp: Tensor) -> Tensor:
     """Adds the identity grid to a displacement field.
 
     Parameters
@@ -169,7 +180,7 @@ def add_identity_grid(disp):
 
 
 @torch.jit.script
-def sub_identity_grid_(disp):
+def sub_identity_grid_(disp: Tensor) -> Tensor:
     """Subtracts the identity grid to a displacement field, inplace.
 
     Parameters
@@ -192,7 +203,7 @@ def sub_identity_grid_(disp):
 
 
 @torch.jit.script
-def sub_identity_grid(disp):
+def sub_identity_grid(disp: Tensor) -> Tensor:
     """Subtracts the identity grid to a displacement field.
 
     Parameters
@@ -209,7 +220,7 @@ def sub_identity_grid(disp):
     return sub_identity_grid_(disp.clone())
 
 
-def affine_grid(mat, shape):
+def affine_grid(mat: Tensor, shape: Sequence[int]) -> Tensor:
     """Create a dense coordinate grid from an affine matrix.
 
     Parameters
@@ -248,7 +259,7 @@ def affine_grid(mat, shape):
     return grid
 
 
-def affine_flow(mat, shape):
+def affine_flow(mat: Tensor, shape: Sequence[int]) -> Tensor:
     """Create a dense displacement field (in voxels) from an affine matrix.
 
     Parameters
@@ -265,3 +276,110 @@ def affine_flow(mat, shape):
 
     """
     return sub_identity_grid_(affine_grid(mat, shape))
+
+
+def flow_jacobian(
+    flow: Tensor,
+    bound: Optional[str] = 'dft',
+    add_identity: bool = True,
+):
+    """Compute the Jacobian of a dense displacement field,
+    using central finite differences.
+
+    Notes
+    -----
+    The behaviour of this function differs from `grid_jacobian` as
+
+    1. The input is assumed to be a relative displacement field with
+     respect to the lattice, in voxels (instead of coordinates into a world
+     space)
+    2. Boundary conditions can be handled (even though boundary can be
+    excluded entirely by setting `bound=None`)
+    3. The output Jacobian is in "voxel/voxel" (and not "mm/mm").
+
+    Parameters
+    ----------
+    flow : `(..., *spatial, ndim) tensor`
+        Dense displacement field, in voxels.
+    bound : `[sequence of] {'zero', 'replicate', 'dct1', 'dct2', 'dst1', 'dst2', 'dft', None}`, default='dft'`
+        Boundary conditions (per dimension).
+        If None, exclude boundary voxels from the computation.
+    add_identity : `bool`, default=True
+        Add the identity matrix to the Jacobian. It is equivalent (but
+        numerically more stable) to computing the Jacobian of the
+        coordinate grid.
+
+    Returns
+    -------
+    jac : `(..., *spatial, ndim, ndim) tensor`
+        Field of Jacobian matrices. Each element `(i, j)` contains
+        $\frac{\partial \phi_i}{\partial x_j}$.
+
+    """
+    ndim = flow.shape[-1]
+    bound = ensure_list(bound, ndim)
+    has_bound = list(map(bool, bound))
+    bound = list(map(lambda x: x or 'dct2', bound))
+    jac = diff(flow, dim=range(-ndim-1, -1), bound=bound)
+
+    # set finite difference to zero on the boundary, when `bound=None`
+    if not all(has_bound):
+        for d, has_bound1 in enumerate(has_bound):
+            if has_bound1:
+                continue
+            jac = jac.movedim(-ndim-1+d, 0)
+            jac[0].zero_()
+            jac[-1].zero_()
+            jac = jac.movedim(0, -ndim-1+d)
+
+    # add identity matrix
+    if add_identity:
+        jac.diagonal(0, -1, -2).add_(1)
+
+    return jac
+
+
+def grid_jacobian(
+        grid: Tensor,
+        voxel_size: OneOrSeveral[float] = 1,
+):
+    """Compute the Jacobian of a dense coordinate grid, using central
+     finite differences.
+
+    Notes
+    -----
+    The behaviour of this function differs from `flow_jacobian` as
+
+    1. The input is assumed to be a grid of coordinates into a world
+    space (in mm), and not a relative displacement (in voxels).
+    2. Boundaries are excluded from the computation (equivalent to option
+    `bound=None` in `flow_jacobian`)
+    3. The voxel size can be provided, such that the output is in "mm/mm"
+    (instead of "voxel/voxel" in `flow_jacobian`)
+
+    Parameters
+    ----------
+    grid : `(..., *spatial, ndim) tensor`
+        Dense grid of coordinates, in mm.
+    voxel_size : `[sequence of] float`, default=1
+        Voxel size.
+
+    Returns
+    -------
+    jac : `(..., *spatial, ndim, ndim) tensor`
+        Field of Jacobian matrices. Each element `(i, j)` contains
+        $\frac{\partial \phi_i}{\partial x_j}$.
+
+    """
+    ndim = grid.shape[-1]
+    voxel_size = make_vector(voxel_size, ndim).tolist()
+    jac = diff(grid, dim=range(-ndim - 1, -1), voxel_size=voxel_size)
+
+    # set finite difference to zero on the boundary
+    for d in range(ndim):
+        jac = jac.movedim(-ndim - 1 + d, 0)
+        jac[0].zero_()
+        jac[-1].zero_()
+        jac = jac.movedim(0, -ndim - 1 + d)
+
+    return jac
