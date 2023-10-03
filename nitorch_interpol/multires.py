@@ -51,6 +51,7 @@ __all__ = [
 from jitfields.resize import resize, restrict
 from jitfields.utils import ensure_list
 from jitfields.typing import OneOrSeveral, BoundType, OrderType, AnchorType
+from .grids import sub_identity_grid, identity_grid_like
 import torch
 from torch import Tensor
 from typing import Optional, Union, Literal, Sequence, List, Tuple
